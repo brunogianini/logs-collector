@@ -42,6 +42,8 @@ jobs:
           
           jobs_failed_id=echo $jobs_failed | jq -c '.jobs[] | select(.conclusion=="failure") | .id'
 
+          echo $jobs_failed_id
+          
           # Busca todos os jobs da run
           jobs_json=$(
             curl -L \
