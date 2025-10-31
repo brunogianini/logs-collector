@@ -28,44 +28,28 @@ jobs:
     needs: [build, test]
     if: ${{ failure() }}
     steps:
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq curl tar
-
-      - name: Fetch and print failed job logs
+      - name: Fetch failed job steps from API
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
         run: |
           echo "Buscando jobs que falharam..."
-          # Lista todos os jobs da workflow
+          
+          # Busca todos os jobs da run
           jobs_json=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
             "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/jobs")
 
-          # Para cada job que falhou
-          echo "$jobs_json" | jq -r '.jobs[] | select(.conclusion=="failure") | .id as $id | .name as $name | "\($id) \($name)"' \
+          # Itera sobre jobs que falharam
+          echo "$jobs_json" | jq -r '.jobs[] | select(.conclusion=="failure") | "\(.id) \(.name)"' \
           | while read job_id job_name; do
               echo ""
               echo "===== Logs do job: $job_name ====="
-              
-              # Baixa o log do job
-              curl -s -L -H "Authorization: token $GITHUB_TOKEN" \
-                "https://api.github.com/repos/$REPO/actions/jobs/$job_id/logs" \
-                -o logs.tar.gz
 
-              # Extrai os logs e imprime apenas os steps que falharam
-              mkdir -p logs_$job_id
-              tar -xzf logs.tar.gz -C logs_$job_id
+              # Busca os steps do job via API
+              steps_json=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+                "https://api.github.com/repos/$REPO/actions/jobs/$job_id")
 
-              # Os arquivos .txt correspondem a cada step
-              for step_log in logs_$job_id/*.txt; do
-                  # Procura por erro no step
-                  if grep -q -i "error" "$step_log"; then
-                      echo "---- Step com erro: $(basename $step_log) ----"
-                      cat "$step_log"
-                      echo ""
-                  fi
-              done
+              # Para cada step que falhou, imprime o nome e o log
+              echo "$steps_json" | jq -r '.steps[] | select(.conclusion=="failure") | "---- Step: \(.name) ----\n\(.text_summary // "Sem log disponível")\n"' 
             done
