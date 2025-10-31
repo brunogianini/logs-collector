@@ -1,4 +1,4 @@
-name: CI/CD com coleta de logs
+name: CI/CD com coleta de logs via API
 
 on:
   push:
@@ -13,9 +13,9 @@ jobs:
 
       - name: Build Step 1
         run: |
-          echo "Build iniciado..."
-          # Simulando falha
-          exit 1
+          echo "Iniciando build..."
+          echo "Simulando erro no build"
+          exit 1  # simula falha
 
   test:
     runs-on: ubuntu-latest
@@ -26,75 +26,71 @@ jobs:
 
       - name: Test Step 1
         run: |
-          echo "Testando aplicação..."
-          # Simulando sucesso
+          echo "Rodando testes..."
           echo "Tudo OK!"
 
   lint:
     runs-on: ubuntu-latest
     needs: [build]
     steps:
-      - name: Lint
+      - name: Lint Step
         run: |
           echo "Rodando lint..."
-          # Simulando falha
-          exit 1
+          exit 1  # simula falha
 
   collect-logs:
     runs-on: ubuntu-latest
     needs: [build, test, lint]
     if: failure()
     steps:
-      - name: Coletar e exibir logs completos dos jobs que falharam
+      - name: Coletar logs de todos os jobs falhos
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RUN_ID: ${{ github.run_id }}
           REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
         run: |
           set -e
-          echo "📥 Baixando logs do workflow $RUN_ID..."
-          curl -sSL \
+          echo "🔍 Buscando jobs falhos via API..."
+          JOBS_JSON=$(curl -sSL \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            -o logs.zip \
-            "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/logs"
+            "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/jobs")
 
-          echo "📦 Extraindo logs..."
-          mkdir logs
-          unzip -q logs.zip -d logs
-          rm logs.zip
+          FAILED_JOBS=$(echo "$JOBS_JSON" | jq -r '.jobs[] | select(.conclusion=="failure") | .id')
 
-          echo "🔍 Detectando jobs que falharam..."
-          curl -sSL \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/jobs" \
-            | jq -r '.jobs[] | select(.conclusion=="failure") | .name' > failed_jobs.txt
-
-          if [ ! -s failed_jobs.txt ]; then
-            echo "✅ Nenhum job falhou."
+          if [ -z "$FAILED_JOBS" ]; then
+            echo "✅ Nenhum job falhou, nada para mostrar."
             exit 0
           fi
 
-          echo "🧾 Jobs com falha:"
-          cat failed_jobs.txt
-          echo "═══════════════════════════════════════════════"
+          echo "🧾 Jobs falhos: $FAILED_JOBS"
 
-          echo "📜 Exibindo logs COMPLETOS dos jobs com falha..."
-          for job in $(cat failed_jobs.txt); do
-            # Nome do arquivo dentro do ZIP geralmente é "<job_name>.txt" com underscores no lugar de espaços
-            file=$(find logs -type f -iname "$(echo "$job" | tr ' ' '_').txt" | head -n 1)
-            if [ -z "$file" ]; then
-              echo "⚠️  Não encontrei log para o job: $job"
-              continue
-            fi
-
-            echo "═══════════════════════════════════════════════"
-            echo "💥 LOG COMPLETO DO JOB: $job"
-            echo "───────────────────────────────────────────────"
-            cat "$file"
+          for JOB_ID in $FAILED_JOBS; do
             echo
+            echo "═══════════════════════════════════════════════"
+            JOB_NAME=$(echo "$JOBS_JSON" | jq -r ".jobs[] | select(.id==$JOB_ID) | .name")
+            echo "💥 JOB: $JOB_NAME"
+            echo "───────────────────────────────────────────────"
+
+            # Buscar steps do job
+            STEPS=$(echo "$JOBS_JSON" | jq -c ".jobs[] | select(.id==$JOB_ID) | .steps[]")
+
+            for STEP in $STEPS; do
+              STEP_CONCLUSION=$(echo "$STEP" | jq -r ".conclusion")
+              STEP_NAME=$(echo "$STEP" | jq -r ".name")
+              STEP_LOG_URL=$(echo "$STEP" | jq -r ".log_url")
+
+              if [ "$STEP_CONCLUSION" == "failure" ]; then
+                echo
+                echo "📜 STEP FALHOU: $STEP_NAME"
+                echo "───────────────────────────────────────────────"
+
+                # Baixar log do step direto
+                curl -sSL -H "Authorization: Bearer $GH_TOKEN" "$STEP_LOG_URL"
+              fi
+            done
           done
 
+          echo
           echo "═══════════════════════════════════════════════"
-          echo "🏁 Fim dos logs de falhas"
+          echo "🏁 Fim dos logs completos dos jobs falhos"
