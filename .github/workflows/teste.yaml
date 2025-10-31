@@ -50,4 +50,4 @@ jobs:
               https://api.github.com/repos/brunogianini/logs-collector/actions/jobs/54145053047/logs
           )
 
-          echo $jobs_json
+          echo $jobs_json | jq -c '.jobs[] | select(.conclusion=="failure")'
