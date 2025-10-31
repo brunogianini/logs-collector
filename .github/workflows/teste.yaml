@@ -39,8 +39,8 @@ jobs:
           jobs_failed=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
             "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs")
 
-          echo $jobs_failed | jq -c '.jobs[] | select(.conclusion=="failure") | .id'
-          jobs_failed_id = $jobs_failed | jq -c '.jobs[] | select(.conclusion=="failure") | .id'
+          
+          jobs_failed_id = echo $jobs_failed | jq -c '.jobs[] | select(.conclusion=="failure") | .id'
 
           # Busca todos os jobs da run
           jobs_json=$(
