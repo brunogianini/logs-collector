@@ -19,7 +19,6 @@ jobs:
     steps:
       - name: Test
         run: echo "Rodando testes"
-
   collect-logs:
     runs-on: ubuntu-latest
     if: failure()
@@ -31,12 +30,32 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           REPO: ${{ github.repository }}
         run: |
-          echo "Baixando logs do workflow $RUN_ID..."
+          echo "📥 Baixando logs do workflow $RUN_ID..."
           curl -L \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             -o logs.zip \
             "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/logs"
+
+      - name: Listar arquivos do ZIP
+        run: |
+          echo "📂 Listando conteúdo do arquivo logs.zip:"
+          unzip -l logs.zip
+
+      - name: Extrair e visualizar logs
+        run: |
+          echo "📦 Extraindo logs..."
+          mkdir logs
+          unzip -q logs.zip -d logs
+
+          echo "🧾 Exibindo início dos arquivos de log:"
+          for f in $(find logs -type f -name "*.txt"); do
+            echo "═══════════════════════════════════════════════"
+            echo "📜 Arquivo: $f"
+            echo "───────────────────────────────────────────────"
+            head -n 40 "$f"  # Mostra apenas as 40 primeiras linhas pra não poluir o log
+            echo
+          done
 
       - name: Publicar logs como artefato
         uses: actions/upload-artifact@v4
