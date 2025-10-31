@@ -67,7 +67,7 @@ jobs:
           cat failed_jobs_logs.txt
 
       - name: Upload logs as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: failed-jobs-logs
           path: failed_jobs_logs.txt
