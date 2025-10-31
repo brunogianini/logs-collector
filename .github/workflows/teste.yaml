@@ -38,18 +38,6 @@ jobs:
           
           # Busca todos os jobs da run
           jobs_json=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-            "https://api.github.com/repos/$REPO/actions/runs/$RUN_ID/jobs")
+            "https://api.github.com/repos/brunogianini/logs-collector/actions/jobs/54145053047/logs")
 
-          # Itera sobre jobs que falharam
-          echo "$jobs_json" | jq -r '.jobs[] | select(.conclusion=="failure") | "\(.id) \(.name)"' \
-          | while read job_id job_name; do
-              echo ""
-              echo "===== Logs do job: $job_name ====="
-
-              # Busca os steps do job via API
-              steps_json=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-                "https://api.github.com/repos/$REPO/actions/jobs/$job_id")
-
-              # Para cada step que falhou, imprime o nome e o log
-              echo "$steps_json" | jq -r '.steps[] | select(.conclusion=="failure") | "---- Step: \(.name) ----\n\(.text_summary // "Sem log disponível")\n"' 
-            done
+          echo $jobs_json
