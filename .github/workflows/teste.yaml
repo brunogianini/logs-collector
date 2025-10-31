@@ -59,42 +59,19 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs")
 
-           FAILED_JOBS=$(echo "$JOBS_JSON" | jq -r '.jobs[] | select(.conclusion=="failure") | .id')
-
-          if [ -z "$FAILED_JOBS" ]; then
-            echo "✅ Nenhum job falhou, nada para mostrar."
-            exit 0
-          fi
-
-          echo "🧾 Jobs falhos encontrados: $FAILED_JOBS"
-
-          for JOB_ID in $FAILED_JOBS; do
-            JOB_NAME=$(echo "$JOBS_JSON" | jq -r ".jobs[] | select(.id==$JOB_ID) | .name")
-            echo
-            echo "═══════════════════════════════════════════════"
-            echo "💥 JOB: $JOB_NAME"
-            echo "───────────────────────────────────────────────"
-
-            # Percorre steps do job falho corretamente
-            echo "$JOBS_JSON" | jq -c ".jobs[] | select(.id==$JOB_ID) | .steps[]" | while read -r STEP; do
-              STEP_CONCLUSION=$(echo "$STEP" | jq -r ".conclusion")
-              STEP_NAME=$(echo "$STEP" | jq -r ".name")
-              STEP_LOG_URL=$(echo "$STEP" | jq -r ".log_url")
-
-              if [ "$STEP_CONCLUSION" == "failure" ]; then
-                echo
-                echo "📜 STEP FALHOU: $STEP_NAME"
-                echo "───────────────────────────────────────────────"
-
-                # Baixar log completo do step diretamente
-                curl -sSL -H "Authorization: Bearer $GH_TOKEN" "$STEP_LOG_URL"
-              fi
-            done
-          done
-
-          echo
-          echo "═══════════════════════════════════════════════"
-          echo "🏁 Fim dos logs completos dos jobs falhos"
+           echo "🧾 Steps que falharam:"
+          echo "$JOBS_JSON" | jq -r '
+            .jobs[]
+            | select(.conclusion=="failure")
+            | "═══════════════════════════════\n💥 JOB: \(.name)\n───────────────────────────────\n"
+              + (
+                  .steps[]
+                  | select(.conclusion=="failure")
+                  | "📌 STEP FALHOU: \(.name)\n   Número: \(.number)\n   Início: \(.started_at)\n   Fim: \(.completed_at)\n"
+                )
+          '
+                     
+          
 
           
           
