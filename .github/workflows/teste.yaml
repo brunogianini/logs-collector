@@ -43,13 +43,14 @@ jobs:
     needs: [build, test, lint]
     if: failure()
     steps:
-      - name: Coletar logs de todos os jobs falhos
+      - name: Coletar logs completos dos jobs falhos
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           RUN_ID: ${{ github.run_id }}
         run: |
           set -e
+
           echo "🔍 Buscando jobs falhos via API..."
           JOBS_JSON=$(curl -sSL \
             -H "Authorization: Bearer $GH_TOKEN" \
@@ -63,19 +64,17 @@ jobs:
             exit 0
           fi
 
-          echo "🧾 Jobs falhos: $FAILED_JOBS"
+          echo "🧾 Jobs falhos encontrados: $FAILED_JOBS"
 
           for JOB_ID in $FAILED_JOBS; do
+            JOB_NAME=$(echo "$JOBS_JSON" | jq -r ".jobs[] | select(.id==$JOB_ID) | .name")
             echo
             echo "═══════════════════════════════════════════════"
-            JOB_NAME=$(echo "$JOBS_JSON" | jq -r ".jobs[] | select(.id==$JOB_ID) | .name")
             echo "💥 JOB: $JOB_NAME"
             echo "───────────────────────────────────────────────"
 
-            # Buscar steps do job
-            STEPS=$(echo "$JOBS_JSON" | jq -c ".jobs[] | select(.id==$JOB_ID) | .steps[]")
-
-            for STEP in $STEPS; do
+            # Percorre steps do job falho corretamente
+            echo "$JOBS_JSON" | jq -c ".jobs[] | select(.id==$JOB_ID) | .steps[]" | while read -r STEP; do
               STEP_CONCLUSION=$(echo "$STEP" | jq -r ".conclusion")
               STEP_NAME=$(echo "$STEP" | jq -r ".name")
               STEP_LOG_URL=$(echo "$STEP" | jq -r ".log_url")
@@ -85,7 +84,7 @@ jobs:
                 echo "📜 STEP FALHOU: $STEP_NAME"
                 echo "───────────────────────────────────────────────"
 
-                # Baixar log do step direto
+                # Baixar log completo do step diretamente
                 curl -sSL -H "Authorization: Bearer $GH_TOKEN" "$STEP_LOG_URL"
               fi
             done
