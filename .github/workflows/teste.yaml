@@ -61,4 +61,7 @@ jobs:
           done <<< "$jobs_failed_info"
   
           echo "Todos os logs foram salvos em $LOG_FILE"
-  
+      
+      - name: Lendo
+        run: |
+          cat failed_jobs_logs.txt
