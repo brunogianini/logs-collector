@@ -65,3 +65,9 @@ jobs:
       - name: Lendo
         run: |
           cat failed_jobs_logs.txt
+
+      - name: Upload logs as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: failed-jobs-logs
+          path: failed_jobs_logs.txt
